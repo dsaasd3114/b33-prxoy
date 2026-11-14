@@ -1,68 +1,38 @@
-/* B33 Proxy launcher — adapted from the Vela project. */
 import { BareMuxConnection } from "../baremux/index.mjs";
-
-const DEFAULT_WISP = "wss://vela-wisp.onrender.com/";
-const WISP_URL = localStorage.getItem("b33:wisp") || DEFAULT_WISP;
-const SEARCH_ENGINE = "https://www.google.com/search?q=%s";
-const BASE = new URL(".", document.baseURI).pathname;
-
-function getEngine(){return localStorage.getItem("b33:engine")==="scramjet"?"scramjet":"uv"}
-function setEngine(engine){localStorage.setItem("b33:engine",engine);reflectEngineUI()}
-let scramjet=null,scramjetReady=false,ready=false,bootError=null;
-function normalizeInput(raw){
- const input=raw.trim();if(!input)return null;
- if(/^https?:\/\//i.test(input))return input;
- if(/^[^\s.]+\.[^\s]+$/.test(input)&&!input.includes(" "))return "https://"+input;
- return SEARCH_ENGINE.replace("%s",encodeURIComponent(input));
-}
-function toProxyUrl(url){
- if(getEngine()==="scramjet"&&scramjetReady)return scramjet.encodeUrl(url);
- return __uv$config.prefix+__uv$config.encodeUrl(url);
-}
-async function boot(){
- if(!navigator.serviceWorker)throw new Error("This browser does not support service workers.");
- if(!window.isSecureContext)throw new Error("B33 Proxy needs HTTPS or localhost.");
- await navigator.serviceWorker.register("./sw.js",{scope:BASE});
- await navigator.serviceWorker.ready;
- const workerUrl=new URL("baremux/worker.js",document.baseURI).href;
- const epoxyUrl=new URL("epoxy/index.mjs",document.baseURI).href;
- const conn=new BareMuxConnection(workerUrl);
- if(await conn.getTransport()!==epoxyUrl)await conn.setTransport(epoxyUrl,[{wisp:WISP_URL}]);
- try{
-  const {ScramjetController}=$scramjetLoadController();
-  scramjet=new ScramjetController({prefix:BASE+"scramjet/",files:{wasm:BASE+"scram/scramjet.wasm.wasm",all:BASE+"scram/scramjet.all.js",sync:BASE+"scram/scramjet.sync.js"}});
-  await scramjet.init();scramjetReady=true;
- }catch(error){console.warn("[B33] Scramjet initialization failed; Ultraviolet remains available.",error)}
- ready=true;
-}
-const form=document.getElementById("search-form");
-const field=document.getElementById("search-field");
-const status=document.getElementById("status");
-const engineButtons=document.querySelectorAll("[data-engine]");
-function setStatus(message,kind=""){status.textContent=message;status.dataset.kind=kind}
-function reflectEngineUI(){
- const active=getEngine();
- engineButtons.forEach(button=>{const selected=button.dataset.engine===active;button.classList.toggle("active",selected);button.setAttribute("aria-pressed",String(selected))});
-}
-async function launch(raw){
- const target=normalizeInput(raw);if(!target)return;
- if(bootError){setStatus("Proxy startup failed: "+bootError.message,"error");return}
- if(!ready){setStatus("Starting proxy engine…","loading");try{await bootPromise}catch(error){setStatus("Proxy startup failed: "+error.message,"error");return}}
- if(getEngine()==="scramjet"&&!scramjetReady)setStatus("Scramjet unavailable. Switch to Ultraviolet.","error");
- else setStatus("Opening destination…","ok");
- location.href=toProxyUrl(target);
-}
-form.addEventListener("submit",event=>{event.preventDefault();launch(field.value)});
-document.querySelectorAll("[data-launch]").forEach(button=>button.addEventListener("click",()=>launch(button.dataset.launch)));
-engineButtons.forEach(button=>button.addEventListener("click",()=>setEngine(button.dataset.engine)));
-document.getElementById("settings-btn").addEventListener("click",()=>{
- const current=localStorage.getItem("b33:wisp")||DEFAULT_WISP;
- const next=prompt("WISP server URL (WebSocket). Leave blank to use the default:",current);
- if(next===null)return;
- if(!next.trim()){localStorage.removeItem("b33:wisp");alert("Default WISP server restored. Reload the page.");return}
- if(!/^wss?:\/\//i.test(next.trim())){alert("Enter a valid ws:// or wss:// address.");return}
- localStorage.setItem("b33:wisp",next.trim());alert("WISP server saved. Reload the page to reconnect.");
-});
-reflectEngineUI();
-setStatus("Starting proxy services…","loading");
-const bootPromise=boot().then(()=>setStatus("Ready. Enter a destination.","ok")).catch(error=>{bootError=error;setStatus("Proxy startup failed: "+error.message,"error");console.error("[B33]",error)});
+const DEFAULT_WISP="wss://vela-wisp.onrender.com/", BASE=new URL(".",document.baseURI).pathname, SEARCH="https://www.google.com/search?q=%s";
+const $=id=>document.getElementById(id), read=(k,d=[])=>{try{return JSON.parse(localStorage.getItem("b33:"+k))??d}catch{return d}}, write=(k,v)=>localStorage.setItem("b33:"+k,JSON.stringify(v));
+let engine=localStorage.getItem("b33:engine")||"uv", scram=null,scramReady=false,ready=false,bootError=null;
+let tabs=read("tabs",[{id:1,url:"",title:"New tab",trail:[]}]),activeTab=tabs[0]?.id||1;
+function normalize(raw){let s=raw.trim();if(!s)return"";if(/^https?:\/\//i.test(s))return s;if(/^[^\s.]+\.[^\s]+$/.test(s)&&!s.includes(" "))return"https://"+s;return SEARCH.replace("%s",encodeURIComponent(s))}
+function proxy(url){return engine==="scramjet"&&scramReady?scram.encodeUrl(url):__uv$config.prefix+__uv$config.encodeUrl(url)}
+function saveTabs(){write("tabs",tabs)}
+function showView(name){document.querySelectorAll(".view").forEach(v=>v.classList.remove("active"));const target=$(name+"-view");if(target)target.classList.add("active");document.querySelectorAll("[data-view]").forEach(b=>b.classList.toggle("active",b.dataset.view===name));if(name==="bookmarks")renderLinks("bookmarks");if(name==="history")renderLinks("history");}
+document.querySelectorAll("[data-view]").forEach(b=>b.addEventListener("click",()=>showView(b.dataset.view)));
+function setStatus(s,k=""){const el=$("status");if(el){el.textContent=s;el.dataset.kind=k}}
+function setEngine(e){engine=e;localStorage.setItem("b33:engine",e);document.querySelectorAll("[data-engine]").forEach(b=>b.classList.toggle("active",b.dataset.engine===e))}
+document.querySelectorAll("[data-engine]").forEach(b=>b.addEventListener("click",()=>setEngine(b.dataset.engine)));
+async function boot(){if(!navigator.serviceWorker||!isSecureContext)throw Error("Proxy services need HTTPS or localhost.");await navigator.serviceWorker.register(BASE+"sw.js",{scope:BASE});await navigator.serviceWorker.ready;const conn=new BareMuxConnection(new URL("baremux/worker.js",document.baseURI).href),epoxy=new URL("epoxy/index.mjs",document.baseURI).href;if(await conn.getTransport()!==epoxy)await conn.setTransport(epoxy,[{wisp:localStorage.getItem("b33:wisp")||DEFAULT_WISP}]);try{const {ScramjetController}=await import("../scramjet/scramjet.controller.js");scram=new ScramjetController({prefix:BASE+"scramjet/",files:{wasm:BASE+"scram/scramjet.wasm.wasm",all:BASE+"scram/scramjet.all.js",sync:BASE+"scram/scramjet.sync.js"}});await scram.init();scramReady=true}catch(e){console.warn("Scramjet unavailable",e)}ready=true}
+const bootPromise=boot().then(()=>setStatus("Ready. Enter a destination.","ok")).catch(e=>{bootError=e;setStatus("Proxy startup issue: "+e.message,"error")});
+function launch(raw){const url=normalize(raw);if(!url)return;if(bootError){setStatus(bootError.message,"error");return}openTab(url)}
+$("search-form").addEventListener("submit",e=>{e.preventDefault();launch($("search-field").value)});
+document.querySelectorAll("[data-launch]").forEach(b=>b.addEventListener("click",()=>launch(b.dataset.launch)));
+function openTab(url=""){const tab={id:Date.now()+Math.floor(Math.random()*1000),url,title:url?new URL(url).hostname:"New tab",trail:[]};tabs.push(tab);activeTab=tab.id;saveTabs();showBrowser();renderTabs();if(url)navigate(url)}
+function showBrowser(){document.querySelectorAll(".view").forEach(v=>v.classList.remove("active"));$("browser-view").classList.add("active");document.querySelectorAll("[data-view]").forEach(b=>b.classList.remove("active"))}
+function current(){return tabs.find(t=>t.id===activeTab)}
+function renderTabs(){$("tabs").innerHTML="";tabs.forEach(t=>{const b=document.createElement("div");b.className="tab"+(t.id===activeTab?" active":"");const label=document.createElement("span");label.textContent=t.title;b.append(label);const x=document.createElement("button");x.textContent="×";x.title="Close tab";x.onclick=e=>{e.stopPropagation();tabs=tabs.filter(v=>v.id!==t.id);if(!tabs.length)tabs=[{id:Date.now(),url:"",title:"New tab",trail:[]}];if(activeTab===t.id)activeTab=tabs[tabs.length-1].id;saveTabs();renderTabs();loadCurrent()};b.append(x);b.onclick=()=>{activeTab=t.id;renderTabs();loadCurrent()};$("tabs").append(b)})}
+function loadCurrent(){const t=current();if(!t)return;$("address-field").value=t.url||"";$("browser-frame").src=t.url?proxy(t.url):"about:blank"}
+async function navigate(url){if(!url)return;await bootPromise;if(bootError){setStatus(bootError.message,"error");return}const t=current();if(!t)return;if(t.url)t.trail.push(t.url);t.url=url;t.title=new URL(url).hostname;saveTabs();renderTabs();$("address-field").value=url;$("browser-frame").src=proxy(url);const hist=read("history",[]);hist.unshift({url,title:t.title,time:Date.now()});write("history",hist.slice(0,100))}
+$("address-form").addEventListener("submit",e=>{e.preventDefault();navigate(normalize($("address-field").value))});
+$("new-tab").onclick=()=>openTab();$("browser-home").onclick=()=>showView("home");$("back").onclick=()=>{const t=current();if(t?.trail.length){t.url=t.trail.pop();saveTabs();loadCurrent()}};$("forward").onclick=()=>{};$("reload").onclick=()=>{const f=$("browser-frame");if(f.src)f.src=f.src};
+$("bookmark-current").onclick=()=>{const t=current();if(!t?.url)return;const list=read("bookmarks",[]);if(!list.some(x=>x.url===t.url)){list.unshift({url:t.url,title:t.title});write("bookmarks",list)}$("bookmark-current").textContent="★"};
+function renderLinks(type){const el=$(type+"-list"),items=read(type,[]);el.innerHTML="";if(!items.length){el.innerHTML='<div class="empty-state">Nothing here yet.</div>';return}items.forEach((item,i)=>{const row=document.createElement("div");row.className="link-card";const info=document.createElement("div");info.className="link-info";const title=document.createElement("strong");title.textContent=item.title||item.url;const url=document.createElement("small");url.textContent=item.url;info.append(title,url);const open=document.createElement("button");open.textContent="Open";open.onclick=()=>{showBrowser();openTab(item.url)};row.append(info,open);if(type==="bookmarks"){const del=document.createElement("button");del.textContent="Remove";del.onclick=()=>{items.splice(i,1);write(type,items);renderLinks(type)};row.append(del)}el.append(row)})}
+$("clear-history").onclick=()=>{write("history",[]);renderLinks("history")};
+const games=[{name:"2048",category:"Puzzle",desc:"The classic number-merging puzzle.",repo:"https://github.com/gabrielecirulli/2048",demo:"https://play2048.co/"},{name:"Hextris",category:"Puzzle",desc:"A fast-paced hexagon puzzle game.",repo:"https://github.com/Hextris/hextris",demo:"https://hextris.io/"},{name:" js13kGames",category:"Arcade",desc:"Tiny HTML5 games made for the js13k competition.",repo:"https://github.com/js13kGames",demo:"https://js13kgames.com/"},{name:"Freeciv",category:"Strategy",desc:"Open-source turn-based strategy game.",repo:"https://github.com/freeciv/freeciv",demo:"https://www.freecivweb.org/"},{name:"LittleJS",category:"Arcade",desc:"Lightweight HTML5 game engine with examples.",repo:"https://github.com/KilledByAPixel/LittleJS",demo:"https://killedbyapixel.github.io/LittleJS/"},{name:"Tetris (React)",category:"Arcade",desc:"Open-source Tetris-style browser project.",repo:"https://github.com/chvin/react-tetris",demo:"https://chvin.github.io/react-tetris/"}];
+const cats=["All",...new Set(games.map(g=>g.category))];cats.forEach(c=>{const o=document.createElement("option");o.value=c;o.textContent=c;$("game-category").append(o)});
+function renderGames(){const q=$("game-search").value.toLowerCase(),cat=$("game-category").value,el=$("games-grid");el.innerHTML="";games.filter(g=>(cat==="All"||g.category===cat)&&(g.name+g.desc+g.category).toLowerCase().includes(q)).forEach(g=>{const card=document.createElement("article");card.className="game-card";const meta=document.createElement("div");meta.className="game-meta";meta.textContent=g.category;const h=document.createElement("h3");h.textContent=g.name;const p=document.createElement("p");p.textContent=g.desc;const actions=document.createElement("div");actions.className="card-actions";const demo=document.createElement("a");demo.href=g.demo;demo.target="_blank";demo.rel="noopener noreferrer";demo.textContent="Play demo ↗";const repo=document.createElement("a");repo.href=g.repo;repo.target="_blank";repo.rel="noopener noreferrer";repo.textContent="GitHub ↗";const fav=document.createElement("button");fav.className="favorite";const faves=read("favorites",[]);fav.textContent=faves.includes(g.name)?"♥":"♡";fav.onclick=()=>{const next=read("favorites",[]);write("favorites",next.includes(g.name)?next.filter(x=>x!==g.name):[...next,g.name]);renderGames()};actions.append(demo,repo,fav);card.append(meta,h,p,actions);el.append(card)});if(!el.children.length)el.innerHTML='<div class="empty-state">No games match that search.</div>'}
+$("game-search").addEventListener("input",renderGames);$("game-category").addEventListener("change",renderGames);renderGames();setEngine(engine);renderTabs();loadCurrent();
+$("settings-btn").onclick=()=>{$("wisp-setting").value=localStorage.getItem("b33:wisp")||DEFAULT_WISP;$("background-setting").value=localStorage.getItem("b33:bg")||"";$("settings-dialog").showModal()};
+$("save-settings").onclick=()=>{const w=$("wisp-setting").value.trim(),bg=$("background-setting").value.trim();if(w&&!/^wss?:\/\//i.test(w)){alert("WISP URL must begin with ws:// or wss://");return}if(w)localStorage.setItem("b33:wisp",w);else localStorage.removeItem("b33:wisp");if(bg){try{const u=new URL(bg);if(!/^https?:$/.test(u.protocol))throw 0;localStorage.setItem("b33:bg",bg)}catch{alert("Enter a valid http(s) image URL.");return}}else localStorage.removeItem("b33:bg");applyPrefs();$("settings-dialog").close();alert("Settings saved. Reload to reconnect to a changed WISP server.")};
+$("reset-background").onclick=()=>{localStorage.removeItem("b33:bg");applyPrefs();$("background-setting").value=""};
+$("accent-setting").onchange=e=>{const c={violet:"#9b5cff",blue:"#818cf8",pink:"#d879ff"}[e.target.value];document.documentElement.style.setProperty("--purple",c)};
+function applyPrefs(){const bg=localStorage.getItem("b33:bg");if(bg){document.body.style.backgroundImage="linear-gradient(#090611c9,#090611e0),url("+JSON.stringify(bg)+")";document.body.classList.add("custom-bg")}else{document.body.style.backgroundImage="";document.body.classList.remove("custom-bg")}}applyPrefs();
