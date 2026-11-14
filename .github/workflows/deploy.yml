@@ -1,0 +1,46 @@
+name: Deploy B33 Proxy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out B33 Proxy
+        uses: actions/checkout@v4
+
+      - name: Fetch Vela proxy runtime and assemble site
+        run: |
+          git clone --depth 1 https://github.com/Chezburgar/Vela.git /tmp/vela
+          mkdir -p _site
+          cp -a /tmp/vela/. _site/
+          cp -a B33-Proxy/. _site/
+          rm -rf _site/.git _site/.github
+          touch _site/.nojekyll
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
