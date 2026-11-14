@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#090611">
+  <meta name="description" content="B33 Proxy — browse beyond the ordinary.">
+  <title>B33 Proxy</title>
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="assets/style.css">
+  <script src="uv/uv.bundle.js" defer></script>
+  <script src="uv/uv.config.js" defer></script>
+  <script src="scram/scramjet.all.js" defer></script>
+</head>
+<body>
+  <div class="ambient ambient-one"></div><div class="ambient ambient-two"></div>
+  <main class="shell">
+    <header class="topbar">
+      <a class="mini-brand" href="./" aria-label="B33 Proxy home"><span class="brand-mark">33</span><span>B33 <b>PROXY</b></span></a>
+      <div class="top-actions"><span class="status-pill"><i></i> PRIVATE SESSION</span><button id="settings-btn" class="icon-btn" type="button" aria-label="Proxy settings" title="Proxy settings">⚙</button></div>
+    </header>
+
+    <section class="hero">
+      <div class="eyebrow"><span></span> YOUR GATEWAY TO THE WEB</div>
+      <div class="hero-logo"><span class="logo-b">B</span><span class="logo-33">33</span></div>
+      <h1>Browse without <em>boundaries.</em></h1>
+      <p class="subtitle">A cleaner way to reach the web. Enter a destination or search for something.</p>
+
+      <form id="search-form" class="search-card" autocomplete="off">
+        <div class="search-row">
+          <span class="search-symbol">⌕</span>
+          <input id="search-field" name="q" type="text" placeholder="Search or enter a website address..." aria-label="Search or enter address" spellcheck="false" autofocus>
+          <button class="go-btn" type="submit">GO <span>↗</span></button>
+        </div>
+        <div class="search-bottom">
+          <div class="engine-label">ENGINE</div>
+          <div class="engine-toggle" role="group" aria-label="Proxy engine">
+            <button type="button" class="engine-btn active" data-engine="uv" aria-pressed="true">Ultraviolet</button>
+            <button type="button" class="engine-btn" data-engine="scramjet" aria-pressed="false">Scramjet</button>
+          </div>
+          <span class="engine-note">Switch engines if a page doesn't load.</span>
+        </div>
+        <p id="status" class="status" role="status" data-kind="loading">Starting proxy services…</p>
+      </form>
+
+      <div class="quick-heading"><span>QUICK ACCESS</span><span class="line"></span></div>
+      <nav class="quick-links" aria-label="Quick launch">
+        <button class="quick-link" type="button" data-launch="https://www.google.com"><span class="quick-icon google">G</span>Google</button>
+        <button class="quick-link" type="button" data-launch="https://www.youtube.com"><span class="quick-icon youtube">▶</span>YouTube</button>
+        <button class="quick-link" type="button" data-launch="https://www.discord.com"><span class="quick-icon discord">◈</span>Discord</button>
+        <button class="quick-link" type="button" data-launch="https://www.reddit.com"><span class="quick-icon reddit">●</span>Reddit</button>
+        <button class="quick-link" type="button" data-launch="https://www.wikipedia.org"><span class="quick-icon wiki">W</span>Wikipedia</button>
+      </nav>
+    </section>
+
+    <footer class="footer">
+      <span>© 2026 B33 Proxy</span><span class="footer-dot">•</span>
+      <a href="https://github.com/Chezburgar/Vela" target="_blank" rel="noopener noreferrer">Powered by Vela</a>
+      <span class="footer-right">Use responsibly. Respect site terms and local rules.</span>
+    </footer>
+  </main>
+  <script src="assets/starfield.js" defer></script>
+  <script type="module" src="assets/app.js"></script>
+</body>
+</html>
